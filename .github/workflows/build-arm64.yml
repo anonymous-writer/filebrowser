@@ -22,6 +22,9 @@ jobs:
           repository: gtsteffaniak/filebrowser
           ref: dev/v2.1.0
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -36,8 +39,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./_docker/Dockerfile
           platforms: linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:v2.1.0-arm64
             ghcr.io/${{ github.repository }}:arm64
+          build-args: |
+            VERSION=v2.1.0
+            REVISION=${{ github.sha }}
