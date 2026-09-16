@@ -19,6 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          repository: gtsteffaniak/filebrowser
           ref: dev/v2.1.0
 
       - name: Set up Docker Buildx
