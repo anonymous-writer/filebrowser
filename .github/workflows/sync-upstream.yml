@@ -1,0 +1,38 @@
+name: Sync v2.1.0 with Upstream
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync from upstream dev/v2.1.0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout own branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2.1.0-arm64
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/gtsteffaniak/filebrowser.git
+          git fetch upstream dev/v2.1.0
+
+      - name: Merge upstream dev/v2.1.0
+        run: |
+          git checkout v2.1.0-arm64
+          git merge --no-edit upstream/dev/v2.1.0
+
+      - name: Push updated branch
+        run: |
+          git push origin v2.1.0-arm64
