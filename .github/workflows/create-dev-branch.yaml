@@ -1,58 +1,38 @@
-name: Create Dev Version
+name: Sync v2.1.0 with Upstream
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to create (format: 0.0.0)"
-        required: true
-        type: string
+
+permissions:
+  contents: write
 
 jobs:
-  create-dev-branch:
-    name: Create Dev Branch
-    runs-on: ubuntu-24.04-arm
+  sync:
+    name: Sync from upstream dev/v2.1.0
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Checkout own branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT }} # Uses the Personal Access Token
+          ref: dev/v2.1.0-arm64
+          fetch-depth: 0
 
-      - name: Validate version format
-        id: validate_version
+      - name: Configure Git
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ ERROR: Version must be in '0.0.0' format."
-            exit 1
-          fi
-          echo "✅ Version format validated: $VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Check if branch already exists
-        id: check_branch
+      - name: Fetch upstream
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          DEV_BRANCH="dev/v$VERSION"
+          git remote add upstream https://github.com/gtsteffaniak/filebrowser.git
+          git fetch upstream dev/v2.1.0
 
-          if git ls-remote --exit-code origin "$DEV_BRANCH"; then
-            echo "❌ ERROR: Branch '$DEV_BRANCH' already exists!"
-            exit 1
-          fi
-          echo "✅ Branch '$DEV_BRANCH' does not exist."
-
-      - name: Create and push new dev branch
+      - name: Merge upstream dev/v2.1.0
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          DEV_BRANCH="dev/v$VERSION"
+          git checkout dev/v2.1.0-arm64
+          git merge --no-edit upstream/dev/v2.1.0
 
-          # Fetch latest changes
-          git fetch origin main
-
-          # Create new branch from main
-          git checkout -b "$DEV_BRANCH" origin/main
-
-          # Push branch to remote
-          git push origin "$DEV_BRANCH"
-
-          echo "✅ Successfully created branch '$DEV_BRANCH'!"
+      - name: Push updated branch
+        run: |
+          git push origin dev/v2.1.0-arm64
