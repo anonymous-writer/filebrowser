@@ -102,7 +102,7 @@
                   :val-background="sourceInfo[link.sourceName]?.usedAlt || 0"
                   :val-text="link.category === 'source-hybrid-2' ? (sourceInfo[link.sourceName]?.usedAlt || 0) : null"
                   :max="sourceInfo[link.sourceName]?.total || 1" 
-                  :status="getProgressBarStatus(sourceInfo[link.sourceName] || {})"
+                  :status="getProgressBarStatus(link, sourceInfo[link.sourceName] || {})"
                   unit="bytes">
                 </ProgressBar>
                 <!-- For other source types, show single bar -->
@@ -112,7 +112,7 @@
                   :val="getProgressBarValue(link, sourceInfo[link.sourceName] || {})" 
                   :val-background="getProgressBarReserved(sourceInfo[link.sourceName] || {})"
                   :max="getProgressBarMax(link, sourceInfo[link.sourceName] || {})" 
-                  :status="getProgressBarStatus(sourceInfo[link.sourceName] || {})"
+                  :status="getProgressBarStatus(link, sourceInfo[link.sourceName] || {})"
                   unit="bytes">
                 </ProgressBar>
               </div>
@@ -131,73 +131,13 @@
       </template>
       <!-- Navigation Mode -->
       <template v-else>
-        <!-- Source card (hidden in shares) -->
-        <div v-if="!isShare" class="source-card-container" ref="sourceCardContainer">
-          <!-- Current Source Card -->
-          <div class="action button source-button navigation-source-card"
-               :class="{ 'has-usage': hasUsageInfo(activeSourceLink) }"
-               @click="navigateToSource(activeSource)" role="button" tabindex="0">
-            <div class="source-container" :class="{ 'has-usage-info': hasUsageInfo(activeSourceLink) }">
-              <i v-if="activeSourceLink.icon && isLinkAccessible(activeSourceLink)"
-                 :class="`${getIconClass(activeSourceLink.icon)} link-icon`">
-                {{ activeSourceLink.icon }}
-              </i>
-              <svg v-else-if="isLinkAccessible(activeSourceLink)"
-                   class="realtime-pulse"
-                   :class="{
-                     active: realtimeActive,
-                     danger: activeSourceInfo.status !== 'indexing' && activeSourceInfo.status !== 'ready',
-                     warning: activeSourceInfo.status === 'indexing',
-                     ready: activeSourceInfo.status === 'ready',
-                   }">
-                <circle class="center" cx="50%" cy="50%" r="7px"></circle>
-                <circle class="pulse" cx="50%" cy="50%" r="10px"></circle>
-              </svg>
-              <HelpTooltipIcon
-                v-else
-                icon="warning"
-                icon-style="symbols"
-                icon-class="warning-icon"
-                :text="$t('sidebar.sourceNotAccessible')"
-              />
-              <!-- Source name -->
-              <span>{{ activeSourceLink.name }}</span>
-              <i v-if="hasUsageInfo(activeSourceLink)"
-                 class="no-select material-symbols-outlined tooltip-info-icon"
-                 :class="{ 'tooltip-info-icon--pressed': pressedSourceInfo === activeSource }"
-                 role="button"
-                 tabindex="0"
-                 @touchstart.stop="onSourceInfoTouchStart(activeSource)"
-                 @touchend.stop="onSourceInfoTouchEnd($event, activeSourceInfo)"
-                 @touchcancel.stop="onSourceInfoTouchCancel"
-                 @click.stop="onSourceInfoClick($event, activeSourceInfo)"
-                 @mouseenter="onSourceInfoMouseEnter($event, activeSourceInfo)"
-                 @mouseleave="onSourceInfoMouseLeave">
-                info
-              </i>
-            </div>
-            <div v-if="hasUsageInfo(activeSourceLink)" class="usage-info">
-              <ProgressBar 
-                v-if="activeSourceLink.category === 'source-hybrid' || activeSourceLink.category === 'source-hybrid-2'"
-                :val="(activeSourceInfo).used || 0"
-                :val-background="(activeSourceInfo).usedAlt || 0"
-                :val-text="activeSourceLink.category === 'source-hybrid-2' ? ((activeSourceInfo).usedAlt || 0) : null"
-                :max="(activeSourceInfo).total || 1" 
-                :status="getProgressBarStatus(activeSourceInfo)"
-                unit="bytes">
-              </ProgressBar>
-              <ProgressBar 
-                v-else
-                :val="getProgressBarValue(activeSourceLink, activeSourceInfo)" 
-                :val-background="getProgressBarReserved(activeSourceInfo)"
-                :max="getProgressBarMax(activeSourceLink, activeSourceInfo)" 
-                :status="getProgressBarStatus(activeSourceInfo)"
-                unit="bytes">
-              </ProgressBar>
-            </div>
-          </div>
+        <!-- Source switcher only when multiple sources (hidden in shares) -->
+        <div
+          v-if="!isShare && sourceNames.length > 1"
+          class="source-card-container"
+          ref="sourceCardContainer"
+        >
           <ExpandDropdown
-            v-if="sourceNames.length > 1"
             class="sidebar-source-switcher"
             :model-value="activeSource"
             :options="sourceDropdownOptions"
@@ -321,9 +261,6 @@ export default {
     sourceNames() {
       return Object.keys(state.sources.info || {});
     },
-    activeSourceInfo() {
-      return this.sourceInfo[this.activeSource] || {};
-    },
     mode() {
       return getters.sidebarMode();
     },
@@ -338,20 +275,6 @@ export default {
         });
       }
       return map;
-    },
-    activeSourceLink() {
-      // If user has a custom link for this source, use it
-      const customLink = this.sourceLinkMap[this.activeSource];
-      if (customLink) {
-        return customLink;
-      }
-      return {
-        name: this.activeSource,
-        category: 'source',
-        target: '/',
-        icon: '',
-        sourceName: this.activeSource,
-      };
     },
     dropdownSourceItems() {
       return this.sourceNames.map(rawName => {
@@ -483,11 +406,27 @@ export default {
       // Direct access to reactive computed property ensures Vue tracks changes
       return this.sourceInfo && link.sourceName ? this.sourceInfo[link.sourceName] || {} : {};
     },
-    getProgressBarStatus(sourceInfo) {
+    getProgressBarStatus(link, sourceInfo) {
       if (sourceInfo.status === 'indexing' && sourceInfo.complexity === 0) {
         return 'indexing';
       }
+      if (this.hasUsageScopeMismatch(link, sourceInfo)) {
+        return 'conflict';
+      }
       return 'default';
+    },
+    hasUsageScopeMismatch(link, sourceInfo) {
+      if (!link || !sourceInfo) return false;
+      const cat = link.category;
+      if (cat !== 'source' && cat !== 'source-hybrid' && cat !== 'source-hybrid-2') {
+        return false;
+      }
+      if (sourceInfo.usageScopeMismatch) {
+        return true;
+      }
+      const used = Number(sourceInfo.used) || 0;
+      const total = Number(sourceInfo.total) || 0;
+      return total > 0 && used > total;
     },
     getProgressBarValue(link, sourceInfo) {
       if (sourceInfo.scopeQuota?.limitBytes > 0) {
@@ -945,12 +884,8 @@ a.sidebar-link-button {
 }
 
 .sidebar-source-switcher {
-  margin-top: 0.5em;
-}
-
-.navigation-source-card {
   margin-top: 0;
-  max-width: 98%;
+  margin-bottom: 0.5em;
 }
 
 .sidebar-divider-container {
