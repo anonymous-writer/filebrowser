@@ -15,8 +15,9 @@ jobs:
       - name: Checkout own branch
         uses: actions/checkout@v4
         with:
-          ref: v2.1.0-arm64
+          ref: dev/v2.1.0-arm64
           fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
 
       - name: Configure Git
         run: |
@@ -30,9 +31,9 @@ jobs:
 
       - name: Merge upstream dev/v2.1.0
         run: |
-          git checkout v2.1.0-arm64
+          git checkout dev/v2.1.0-arm64
           git merge --no-edit upstream/dev/v2.1.0
 
       - name: Push updated branch
         run: |
-          git push origin v2.1.0-arm64
+          git push origin dev/v2.1.0-arm64
