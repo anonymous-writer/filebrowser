@@ -3,7 +3,7 @@ name: Build ARM64
 on:
   push:
     branches:
-      - "v2.1.0-arm64"
+      - "v2.1.1-arm64"
   workflow_dispatch:
 
 permissions:
@@ -19,11 +19,11 @@ jobs:
       # ----------------------------------------
       # 1. DEINEN DEV-STAND holen
       # ----------------------------------------
-      - name: Checkout FileBrowser dev/v2.1.0-arm64
+      - name: Checkout FileBrowser dev/v2.1.1-arm64
         uses: actions/checkout@v4
         with:
           repository: anonymous-writer/filebrowser
-          ref: dev/v2.1.0-arm64
+          ref: dev/v2.1.1-arm64
 
       # ----------------------------------------
       # 2. Node.js / Frontend
@@ -52,7 +52,7 @@ jobs:
         run: |
           go build \
             -o filebrowser \
-            --ldflags="-w -s -X 'github.com/gtsteffaniak/filebrowser/backend/internal/version.Version=v2.1.0'"
+            --ldflags="-w -s -X 'github.com/gtsteffaniak/filebrowser/backend/internal/version.Version=v2.1.1'"
 
       # ----------------------------------------
       # 4. ARM64 Binary als Download
@@ -60,7 +60,7 @@ jobs:
       - name: Upload ARM64 binary
         uses: actions/upload-artifact@v4
         with:
-          name: filebrowser-v2.1.0-linux-arm64
+          name: filebrowser-v2.1.1-linux-arm64
           path: backend/filebrowser
 
       # ----------------------------------------
@@ -90,8 +90,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:v2.1.0-arm64
+            ghcr.io/${{ github.repository }}:v2.1.1-arm64
             ghcr.io/${{ github.repository }}:arm64
           build-args: |
-            VERSION=v2.1.0
+            VERSION=v2.1.1
             REVISION=${{ github.sha }}
