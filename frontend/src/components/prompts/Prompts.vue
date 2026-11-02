@@ -97,6 +97,7 @@ import Replace from "./Replace.vue";
 import ReplaceRename from "./ReplaceRename.vue";
 import Share from "./Share.vue";
 import Upload from "./Upload.vue";
+import URLDownload from "./URLDownload.vue";
 import CreateApi from "./CreateApi.vue";
 import ActionApi from "./ActionApi.vue";
 import SidebarLinks from "./SidebarLinks.vue";
@@ -160,6 +161,7 @@ export default {
     Totp,
     RequirePasswordChange,
     Upload,
+    URLDownload,
     Sidebar,
     CreateApi,
     ActionApi,

@@ -94,6 +94,12 @@
           @action="showUploadPrompt"
         />
         <action
+          v-if="showCreateFileActions"
+          icon="link"
+          label="URL Download"
+          @action="showURLDownloadPrompt"
+        />
+        <action
           v-if="showQuotaAction"
           icon="storage"
           :label="quotaActionLabel"
@@ -1047,6 +1053,13 @@ export default {
     goToPreview() {
       mutations.closeHovers();
       void this.$router.replace({ hash: "#preview" });
+    },
+    showURLDownloadPrompt() {
+      mutations.closeHovers();
+      mutations.showPrompt({
+        name: "URLDownload",
+        props: { targetPath: state.req.path, targetSource: state.req.source },
+      });
     },
     showUploadPrompt() {
       mutations.closeHovers();
