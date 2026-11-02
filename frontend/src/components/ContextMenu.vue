@@ -1058,7 +1058,7 @@ export default {
       mutations.closeHovers();
       mutations.showPrompt({
         name: "URLDownload",
-        props: { targetPath: state.req.path, targetSource: state.req.source },
+        props: { targetPath: state.req?.path || "/", targetSource: state.req?.source || state.sources.current },
       });
     },
     showUploadPrompt() {

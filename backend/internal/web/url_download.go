@@ -28,6 +28,9 @@ func urlDownloadHandler(w http.ResponseWriter, r *http.Request, d *Context) (int
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&input); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("invalid request")
 	}
+	if strings.TrimSpace(input.Path) == "" || strings.TrimSpace(input.Source) == "" {
+		return http.StatusBadRequest, fmt.Errorf("target folder and source are required")
+	}
 	target, err := url.ParseRequestURI(strings.TrimSpace(input.URL))
 	if err != nil || (target.Scheme != "http" && target.Scheme != "https") || target.Hostname() == "" || target.User != nil {
 		return http.StatusBadRequest, fmt.Errorf("only valid HTTP and HTTPS URLs are supported")
@@ -55,7 +58,12 @@ func urlDownloadHandler(w http.ResponseWriter, r *http.Request, d *Context) (int
 			filename = params["filename"]
 		}
 	}
-	filename = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(filename, "/", "_"), "\\", "_"))
+	filename = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == 0 || r < 0x20 || r == 0x7f {
+			return '_'
+		}
+		return r
+	}, filename))
 	if filename == "" || filename == "." || filename == "/" {
 		return http.StatusBadRequest, fmt.Errorf("could not determine a safe filename")
 	}
@@ -93,6 +101,9 @@ func urlDownloadHandler(w http.ResponseWriter, r *http.Request, d *Context) (int
 
 func publicURLHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// Do not use environment-configured proxies: the proxy would resolve the
+	// destination itself and bypass the IP checks in DialContext.
+	transport.Proxy = nil
 	transport.ResponseHeaderTimeout = 30 * time.Second
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
