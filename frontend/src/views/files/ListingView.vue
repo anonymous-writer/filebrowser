@@ -1228,6 +1228,76 @@ export default {
       }
 
       if (event.type === "drop") {
+        // ZIP-DIAG: inspect the original browser drop before DataTransferItems
+        // are handed to the Upload component. This is read-only diagnostics.
+        const transfer = event.dataTransfer;
+        try {
+          const types = Array.from(transfer?.types || []);
+          const items = Array.from(transfer?.items || []);
+          const files = Array.from(transfer?.files || []);
+
+          const itemDetails = items.map((item, index) => {
+            let file = null;
+            let entry = null;
+            try {
+              file = item.kind === "file" ? item.getAsFile() : null;
+            } catch (error) {
+              file = { diagnosticError: String(error) };
+            }
+            try {
+              entry = item.kind === "file" && item.webkitGetAsEntry
+                ? item.webkitGetAsEntry()
+                : null;
+            } catch (error) {
+              entry = { diagnosticError: String(error) };
+            }
+            return {
+              index,
+              kind: item.kind,
+              type: item.type,
+              file: file ? {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                webkitRelativePath: file.webkitRelativePath,
+              } : null,
+              entry: entry ? {
+                name: entry.name,
+                fullPath: entry.fullPath,
+                isFile: entry.isFile,
+                isDirectory: entry.isDirectory,
+              } : null,
+            };
+          });
+
+          const exposedTextData = {};
+          for (const type of types) {
+            if (type === "text/plain" || type === "text/uri-list" || type.startsWith("text/")) {
+              try {
+                const value = transfer.getData(type);
+                if (value) exposedTextData[type] = value.slice(0, 1000);
+              } catch (error) {
+                exposedTextData[type] = `getData failed: ${String(error)}`;
+              }
+            }
+          }
+
+          console.group("[ZIP-DIAG] ListingView original drop event");
+          console.log("Event type:", event.type);
+          console.log("DataTransfer.types:", types);
+          console.log("DataTransfer.items:", itemDetails);
+          console.log("DataTransfer.files:", files.map(file => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            webkitRelativePath: file.webkitRelativePath,
+          })));
+          console.log("Exposed text data:", exposedTextData);
+          console.groupEnd();
+        } catch (error) {
+          console.warn("[ZIP-DIAG] Could not inspect original drop:", error);
+        }
+
         mutations.showPrompt({
           name: "upload",
           props: {
