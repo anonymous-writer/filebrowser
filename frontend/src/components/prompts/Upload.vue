@@ -521,16 +521,41 @@ export default {
     const onDrop = async (event) => {
       isDragging.value = false;
       const destination = getDestinationPath();
-      if (event.dataTransfer.items) {
-        const items = Array.from(event.dataTransfer.items);
-        await processDroppedItems(items, destination);
-      } else {
-        const droppedFiles = event.dataTransfer.files;
-        console.log(
-          "Upload.vue: Processing dropped files (fallback):",
-          droppedFiles
-        );
+      const transfer = event.dataTransfer;
+
+      // Diagnose: Welche Informationen liefert der Explorer beim Ablegen?
+      console.group("[ZIP-DIAG] Drop-Ereignis");
+      console.log("Destination:", destination);
+      console.log("DataTransfer.types:", Array.from(transfer?.types || []));
+      console.log("DataTransfer.effectAllowed:", transfer?.effectAllowed);
+      console.log("DataTransfer.dropEffect:", transfer?.dropEffect);
+
+      const droppedFiles = Array.from(transfer?.files || []);
+      console.log("DataTransfer.files:", droppedFiles.map((file) => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        webkitRelativePath: file.webkitRelativePath,
+        lastModified: file.lastModified,
+      })));
+
+      const droppedItems = Array.from(transfer?.items || []);
+      console.log("DataTransfer.items:", droppedItems.map((item, index) => ({
+        index,
+        kind: item.kind,
+        type: item.type,
+        hasGetAsFile: typeof item.getAsFile === "function",
+        hasWebkitGetAsEntry: typeof item.webkitGetAsEntry === "function",
+      })));
+      console.groupEnd();
+
+      if (droppedItems.length > 0) {
+        await processDroppedItems(droppedItems, destination);
+      } else if (droppedFiles.length > 0) {
+        console.log("[ZIP-DIAG] Fallback über DataTransfer.files – relative Pfade können fehlen.", droppedFiles);
         processFileList(droppedFiles, destination);
+      } else {
+        console.warn("[ZIP-DIAG] Drop enthält weder DataTransfer.items noch DataTransfer.files.");
       }
     };
 
@@ -606,6 +631,12 @@ const processDroppedItems = async (items, destination) => {
     console.log("type:", item.type);
     console.log("webkitGetAsEntry verfügbar:",
       typeof item.webkitGetAsEntry === "function");
+    console.log("Item-Metadaten:", {
+      kind: item.kind,
+      type: item.type,
+      hasGetAsFile: typeof item.getAsFile === "function",
+      hasWebkitGetAsEntry: typeof item.webkitGetAsEntry === "function",
+    });
 
     const file = item.getAsFile();
     if (file) {
