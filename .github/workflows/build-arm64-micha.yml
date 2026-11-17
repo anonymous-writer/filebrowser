@@ -4,7 +4,7 @@ name: Build ARM64
 on:
   push:
     branches:
-      - main
+      - v2.1.5
   workflow_dispatch:
 
 permissions:
