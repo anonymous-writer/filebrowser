@@ -4,7 +4,7 @@ name: Build ARM64
 on:
   push:
     branches:
-      - v2.1.5
+      - "**"
   workflow_dispatch:
 
 permissions:
@@ -17,11 +17,15 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: Checkout main branch
+      # Immer den Branch bzw. Commit auschecken,
+      # der diesen Workflow ausgelöst hat.
+      - name: Checkout active branch
         uses: actions/checkout@v4
-        with:
-          repository: anonymous-writer/filebrowser
-          ref: main
+
+      - name: Show build version
+        run: |
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -31,7 +35,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          npm i
+          npm ci
           npm run build
 
       - name: Set up Go
@@ -44,12 +48,12 @@ jobs:
         run: |
           go build \
             -o filebrowser \
-            --ldflags="-w -s -X github.com/gtsteffaniak/filebrowser/backend/internal/version.Version=main"
+            --ldflags="-w -s -X github.com/gtsteffaniak/filebrowser/backend/internal/version.Version=${GITHUB_REF_NAME}"
 
       - name: Upload ARM64 binary
         uses: actions/upload-artifact@v4
         with:
-          name: filebrowser-main-linux-arm64
+          name: filebrowser-${{ github.ref_name }}-linux-arm64
           path: backend/filebrowser
 
       - name: Set up Docker Buildx
@@ -62,6 +66,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Erzeugt automatisch einen gültigen Docker-Tag
+      # aus dem Branch-Namen, auch bei Branches mit "/".
+      - name: Generate Docker tags
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch,suffix=-arm64
+            type=raw,value=arm64
+
       - name: Build and push ARM64 Docker image
         uses: docker/build-push-action@v6
         with:
@@ -69,10 +84,7 @@ jobs:
           file: ./_docker/Dockerfile.slim
           platforms: linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:main-arm64
-            ghcr.io/${{ github.repository }}:arm64
+          tags: ${{ steps.docker_meta.outputs.tags }}
           build-args: |
-            VERSION=main
+            VERSION=${{ github.ref_name }}
             REVISION=${{ github.sha }}
-
