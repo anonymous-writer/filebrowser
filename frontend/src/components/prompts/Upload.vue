@@ -546,46 +546,122 @@ export default {
       isDragging.value = false;
     };
 
-    const getFilesFromDirectoryEntry = async (entry) => {
-      if (entry.isFile) {
-        return new Promise((resolve) => {
-          entry.file((file) => {
-            const relativePath = entry.fullPath.startsWith("/")
-              ? entry.fullPath.substring(1)
-              : entry.fullPath;
-            resolve([{ file, relativePath }]);
-          });
-        });
-      }
-      if (entry.isDirectory) {
-        const reader = entry.createReader();
-        const pathLabel = entry.fullPath || entry.name || "";
-        const entries = await readAllDirectoryEntries(reader, pathLabel);
-        const allFiles = await Promise.all(
-          entries.map((subEntry) => getFilesFromDirectoryEntry(subEntry))
-        );
-        return allFiles.flat();
-      }
-      return [];
-    };
 
-    const processDroppedItems = async (items, destination) => {
-      const filesToUpload = [];
-      const promises = items.map(item => {
-        const entry = item.webkitGetAsEntry();
-        if (entry) {
-          return getFilesFromDirectoryEntry(entry);
-        }
-        return Promise.resolve([]);
+const getFilesFromDirectoryEntry = async (entry) => {
+  if (entry.isFile) {
+    return new Promise((resolve) => {
+      entry.file((file) => {
+        const relativePath = entry.fullPath.startsWith("/")
+          ? entry.fullPath.substring(1)
+          : entry.fullPath;
+
+        console.debug("[ZIP-DIAG] Datei gelesen:", {
+          name: file.name,
+          entryName: entry.name,
+          fullPath: entry.fullPath,
+          relativePath: relativePath,
+          size: file.size,
+          type: file.type
+        });
+
+        resolve([{ file, relativePath }]);
+      });
+    });
+  }
+
+  if (entry.isDirectory) {
+    console.debug("[ZIP-DIAG] Verzeichnis:", {
+      name: entry.name,
+      fullPath: entry.fullPath
+    });
+
+    const reader = entry.createReader();
+    const pathLabel = entry.fullPath || entry.name || "";
+    const entries = await readAllDirectoryEntries(reader, pathLabel);
+
+    const allFiles = await Promise.all(
+      entries.map((subEntry) => getFilesFromDirectoryEntry(subEntry))
+    );
+
+    return allFiles.flat();
+  }
+
+  return [];
+};
+
+
+
+const processDroppedItems = async (items, destination) => {
+  console.group("[ZIP-DIAG] processDroppedItems");
+
+  console.log("Destination:", destination);
+  console.log("Anzahl DataTransferItems:", items.length);
+
+  const filesToUpload = [];
+
+  const promises = items.map((item, index) => {
+    console.group(`[ZIP-DIAG] Item ${index}`);
+
+    console.log("kind:", item.kind);
+    console.log("type:", item.type);
+    console.log("webkitGetAsEntry verfügbar:",
+      typeof item.webkitGetAsEntry === "function");
+
+    const file = item.getAsFile();
+    if (file) {
+      console.log("getAsFile():", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        webkitRelativePath: file.webkitRelativePath
+      });
+    } else {
+      console.log("getAsFile(): null");
+    }
+
+    const entry = item.webkitGetAsEntry();
+
+    if (entry) {
+      console.log("Entry:", {
+        name: entry.name,
+        fullPath: entry.fullPath,
+        isFile: entry.isFile,
+        isDirectory: entry.isDirectory
       });
 
-      const allFiles = await Promise.all(promises);
-      for (const files of allFiles) { filesToUpload.push(...files); }
+      console.groupEnd();
+      return getFilesFromDirectoryEntry(entry);
+    }
 
-      if (filesToUpload.length > 0) {
-        void uploadManager.add(destination, filesToUpload);
-      }
-    };
+    console.warn("Kein Entry vorhanden!");
+    console.groupEnd();
+
+    return Promise.resolve([]);
+  });
+
+  const allFiles = await Promise.all(promises);
+
+  for (const files of allFiles) {
+    filesToUpload.push(...files);
+  }
+
+  console.group("[ZIP-DIAG] Ergebnis");
+
+  console.table(filesToUpload.map(item => ({
+    name: item.file.name,
+    relativePath: item.relativePath,
+    size: item.file.size
+  })));
+
+  console.log("Dateien insgesamt:", filesToUpload.length);
+  console.groupEnd();
+
+  if (filesToUpload.length > 0) {
+    void uploadManager.add(destination, filesToUpload);
+  }
+
+  console.groupEnd();
+};
 
     const processFileList = (fileList, destination) => {
       const filesToAdd = Array.from(fileList).map((file) => ({
